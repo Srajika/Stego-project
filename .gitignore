@@ -5,3 +5,6 @@ scratch_*
 outputs/
 images/stego*
 images/demo_*
+images/raw/
+images/dataset/
+.venv/
