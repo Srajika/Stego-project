@@ -208,7 +208,10 @@ def _fully_embedded_calibration(scratch: Path, cover_path: Path) -> None:
     mean_statistic = float(np.mean(statistics))
     mean_dof = float(np.mean(degrees_of_freedom))
     finite_p_values = np.asarray(p_values, dtype=np.float64)
-    print("\n100-crop full-embedding calibration")
+    print(
+        "\nPAIR detector (retained for comparison; known to be mismatched "
+        "to the nearer-parity embedding)"
+    )
     print(
         "Crops: 25 each at 256x192, 512x384, 800x600, and 960x640; "
         "each crop was clamped to the processed control before random parity "
@@ -222,6 +225,57 @@ def _fully_embedded_calibration(scratch: Path, cover_path: Path) -> None:
         fraction = float(np.mean(finite_p_values >= threshold))
         print(f"fraction(p_value >= {threshold:g})={fraction:.2f}")
     print(f"finite_p_values={int(np.isfinite(finite_p_values).sum())}/100")
+
+
+def _fully_embedded_parity_calibration(scratch: Path, cover_path: Path) -> None:
+    """Regress detect_dct_parity on 100 crops with random parity in every block."""
+    crop_sizes = [(256, 192), (512, 384), (800, 600), (960, 640)]
+    crop_rng = np.random.default_rng(20261105)
+    statistics: list[float] = []
+    p_values: list[float] = []
+
+    with Image.open(cover_path) as source:
+        cover = np.asarray(source.convert("RGB"), dtype=np.uint8)
+    image_height, image_width = cover.shape[:2]
+
+    crop_path = scratch / "parity_calibration_crop.png"
+    control_path = scratch / "parity_calibration_control.png"
+    stego_path = scratch / "parity_calibration_full.png"
+    for index in range(100):
+        width, height = crop_sizes[index % len(crop_sizes)]
+        left = int(crop_rng.integers(0, image_width - width + 1))
+        top = int(crop_rng.integers(0, image_height - height + 1))
+        crop = cover[top:top + height, left:left + width, :]
+        Image.fromarray(crop).save(crop_path, format="PNG")
+        _save_processed_control(crop_path, control_path)
+
+        block_count = _read_quantized_coefficients(control_path).size
+        random_parities = np.random.default_rng(20261105 + index).integers(
+            0, 2, size=block_count, dtype=np.uint8
+        )
+        _embed_bits(control_path, stego_path, random_parities, every_block=True)
+        result = detect_dct_parity(stego_path)
+        _assert_parity_result(result)
+        statistics.append(result["statistic"])
+        p_values.append(result["p_value"])
+
+    mean_statistic = float(np.mean(statistics))
+    finite_p_values = np.asarray(p_values, dtype=np.float64)
+    fractions = {
+        threshold: float(np.mean(finite_p_values >= threshold))
+        for threshold in (0.5, 0.1, 0.01)
+    }
+    assert 0.5 < mean_statistic < 1.6, mean_statistic
+    assert fractions[0.01] >= 0.95, fractions[0.01]
+
+    print("\n100-crop detect_dct_parity calibration")
+    print(
+        "Crops: 25 each at 256x192, 512x384, 800x600, and 960x640; "
+        "independent random parity was written into every complete block."
+    )
+    print(f"mean_statistic={mean_statistic:.6f}")
+    for threshold, fraction in fractions.items():
+        print(f"fraction(p_value >= {threshold:g})={fraction:.2f}")
 
 
 def run_tests() -> None:
@@ -309,6 +363,7 @@ def run_tests() -> None:
             f"{fill_count} random fill bits complete the bit capacity."
         )
         _fully_embedded_calibration(scratch, cover_path)
+        _fully_embedded_parity_calibration(scratch, cover_path)
 
 
 if __name__ == "__main__":

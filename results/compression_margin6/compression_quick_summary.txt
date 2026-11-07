@@ -1,0 +1,73 @@
+Compression study mode: quick
+Usable images selected: 3; unusable manifest rows skipped: 4
+JPEG qualities: 100, 70; variants: 4:4:4 (subsampling=0), Pillow default (subsampling omitted)
+Payload per image: 40 seeded random bytes -> Base64 UTF-8 message + 5-byte marker + 64-byte HMAC tag
+[1/3] bright/bright_01.png
+[2/3] bright/bright_02.png
+[3/3] bright/bright_03.png
+
+No-compression baseline failures (excluded from JPEG summary tables):
+  bright_01.png / DCT-q90: 1 bit errors; DCT inverse-transform integer rounding / RGB-YCbCr round trip
+  bright_02.png / DCT-q90: 8 bit errors; DCT inverse-transform integer rounding / RGB-YCbCr round trip
+  bright_03.png / DCT-q90: 1 bit errors; DCT inverse-transform integer rounding / RGB-YCbCr round trip
+
+Cover-only JPEG loss against the original cover:
+JPEG q | subsampling   | cover-only PSNR (dB) | cover-only SSIM | n
+-------|---------------|---------------------|-----------------|---
+    70 | 4:4:4         |             32.0516 |        0.930002 | 3
+    70 | Pillow default |             31.1566 |        0.920694 | 3
+   100 | 4:4:4         |             51.1018 |        0.996204 | 3
+   100 | Pillow default |             38.0996 |        0.983114 | 3
+
+Processed-control cost against the original cover (no message):
+image                         | processed-control PSNR (dB) | processed-control SSIM
+------------------------------|-----------------------------|-----------------------
+bright/bright_01.png             |                     44.3530 |              0.996327
+bright/bright_02.png             |                     44.3106 |              0.997420
+bright/bright_03.png             |                     44.2761 |              0.996568
+
+Exact recovery and BER across images (only no-compression-clean image/method pairs):
+method     | JPEG q | subsampling   | exact recovery k/n (%) | mean BER (SD) | n
+-----------|--------|---------------|------------------------|---------------|---
+LSB        |     70 | 4:4:4         |             0/3 (0.0%) | 0.500000 / 0.014236 | 3
+LSB        |     70 | Pillow default |             0/3 (0.0%) | 0.518000 / 0.007257 | 3
+LSB        |    100 | 4:4:4         |             0/3 (0.0%) | 0.375667 / 0.003859 | 3
+LSB        |    100 | Pillow default |             0/3 (0.0%) | 0.477667 / 0.011470 | 3
+DCT-q50    |     70 | 4:4:4         |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q50    |     70 | Pillow default |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q50    |    100 | 4:4:4         |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q50    |    100 | Pillow default |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q75    |     70 | 4:4:4         |            1/3 (33.3%) | 0.002333 / 0.001700 | 3
+DCT-q75    |     70 | Pillow default |            1/3 (33.3%) | 0.002333 / 0.001700 | 3
+DCT-q75    |    100 | 4:4:4         |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q75    |    100 | Pillow default |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+
+Embedding cost from stego PNG against the original cover:
+method     | mean PNG embedding PSNR | mean PNG embedding SSIM | n images
+-----------|-------------------------|-------------------------|---
+LSB        |                 88.3149 |                0.999999 | 3
+DCT-q50    |                 43.7709 |                0.993741 | 3
+DCT-q75    |                 44.1867 |                0.996125 | 3
+DCT-q90    |                 44.2924 |                0.996661 | 3
+
+Exploratory, small n - category: bright
+method     | JPEG q | subsampling   | exact recovery k/n (%) | mean BER (SD) | n
+-----------|--------|---------------|------------------------|---------------|---
+LSB        |     70 | 4:4:4         |             0/3 (0.0%) | 0.500000 / 0.014236 | 3
+LSB        |     70 | Pillow default |             0/3 (0.0%) | 0.518000 / 0.007257 | 3
+LSB        |    100 | 4:4:4         |             0/3 (0.0%) | 0.375667 / 0.003859 | 3
+LSB        |    100 | Pillow default |             0/3 (0.0%) | 0.477667 / 0.011470 | 3
+DCT-q50    |     70 | 4:4:4         |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q50    |     70 | Pillow default |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q50    |    100 | 4:4:4         |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q50    |    100 | Pillow default |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q75    |     70 | 4:4:4         |            1/3 (33.3%) | 0.002333 / 0.001700 | 3
+DCT-q75    |     70 | Pillow default |            1/3 (33.3%) | 0.002333 / 0.001700 | 3
+DCT-q75    |    100 | 4:4:4         |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+DCT-q75    |    100 | Pillow default |           3/3 (100.0%) | 0.000000 / 0.000000 | 3
+
+Images skipped after errors: none
+Total runtime: 175.002 seconds
+CSV: C:\Users\sraji\Downloads\Stego-project\results\compression_margin6\compression_results.csv
+Plot: C:\Users\sraji\Downloads\Stego-project\results\compression_margin6\recovery_vs_jpeg_quality.png
+Plot: C:\Users\sraji\Downloads\Stego-project\results\compression_margin6\embedding_psnr_vs_quality.png

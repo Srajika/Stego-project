@@ -7,6 +7,7 @@ import base64
 import csv
 import math
 import sys
+import subprocess
 import tempfile
 import time
 from collections import defaultdict
@@ -31,6 +32,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from stego.common import STOP_MARKER, TAG_BYTES, build_payload, bytes_to_bits
 from stego.dct import (
+    MAX_Y,
+    MIN_Y,
     extract as dct_extract,
     hide as dct_hide,
     read_majority_bits,
@@ -39,7 +42,7 @@ from stego.lsb import _position_order, extract as lsb_extract, hide as lsb_hide
 from stego.tamper import derive_keys, make_tag
 
 
-JPEG_QUALITIES = (100, 90, 75, 70, 50, 30)
+JPEG_QUALITIES = (100, 90, 75, 70, 65, 60, 50, 30)
 QUICK_JPEG_QUALITIES = (100, 70)
 SUBSAMPLING_VARIANTS = ("4:4:4", "Pillow default")
 PAYLOAD_SEED = 20261105
@@ -65,6 +68,8 @@ CSV_COLUMNS = (
     "exact_recovery",
     "stego_png_psnr",
     "stego_png_ssim",
+    "processed_control_psnr",
+    "processed_control_ssim",
     "stego_reconstruction_psnr",
     "stego_reconstruction_ssim",
     "cover_reconstruction_psnr",
@@ -148,6 +153,25 @@ def _save_jpeg(
 def _read_rgb(path: Path) -> np.ndarray:
     with Image.open(path) as image:
         return np.asarray(image.convert("RGB"), dtype=np.uint8)
+
+
+def _processed_control_rgb(cover_rgb: np.ndarray) -> np.ndarray:
+    """Return the no-message Y clamp and RGB round trip used by DCT embedding."""
+    height, width = cover_rgb.shape[:2]
+    covered_height = height // 8 * 8
+    covered_width = width // 8 * 8
+    ycbcr = np.asarray(Image.fromarray(cover_rgb).convert("YCbCr"), dtype=np.uint8)
+    modified_ycbcr = ycbcr.copy()
+    modified_ycbcr[:covered_height, :covered_width, 0] = np.clip(
+        ycbcr[:covered_height, :covered_width, 0].astype(np.float64), MIN_Y, MAX_Y
+    ).astype(np.uint8)
+    processed_rgb = np.array(
+        Image.frombytes("YCbCr", (width, height), modified_ycbcr.tobytes()).convert("RGB"),
+        dtype=np.uint8,
+    )
+    processed_rgb[covered_height:, :, :] = cover_rgb[covered_height:, :, :]
+    processed_rgb[:, covered_width:, :] = cover_rgb[:, covered_width:, :]
+    return processed_rgb
 
 
 def _make_record(**values: Any) -> dict[str, Any]:
@@ -272,6 +296,21 @@ def _cover_baseline_summary(records: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _processed_control_summary(records: list[dict[str, Any]]) -> str:
+    controls = [row for row in records if row["record_type"] == "processed_control"]
+    lines = [
+        "image                         | processed-control PSNR (dB) | processed-control SSIM",
+        "------------------------------|-----------------------------|-----------------------",
+    ]
+    for row in controls:
+        lines.append(
+            f"{row['category']}/{row['image']:<25} | "
+            f"{float(row['processed_control_psnr']):>27.4f} | "
+            f"{float(row['processed_control_ssim']):>21.6f}"
+        )
+    return "\n".join(lines)
+
+
 def _save_plots(records: list[dict[str, Any]], output_dir: Path) -> list[Path]:
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
     methods = ("LSB", "DCT-q50", "DCT-q75", "DCT-q90")
@@ -330,6 +369,21 @@ def _save_plots(records: list[dict[str, Any]], output_dir: Path) -> list[Path]:
     return [recovery_path, psnr_path]
 
 
+def _git_commit_hash(root: Path) -> str:
+    """Return HEAD's commit hash when git is available for this project."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return "unavailable"
+    return result.stdout.strip() if result.returncode == 0 else "unavailable"
+
+
 def _write_run_info(
     path: Path,
     started: datetime,
@@ -338,6 +392,7 @@ def _write_run_info(
     eligible_count: int,
     unusable_count: int,
     error_count: int,
+    git_commit_hash: str,
 ) -> None:
     quality_list = QUICK_JPEG_QUALITIES if quick else JPEG_QUALITIES
     content = [
@@ -345,6 +400,8 @@ def _write_run_info(
         f"Started: {started.astimezone().isoformat(timespec='seconds')}",
         f"Finished: {finished.astimezone().isoformat(timespec='seconds')}",
         f"Mode: {'quick' if quick else 'full'}",
+        f"Git commit hash: {git_commit_hash}",
+        f"Brightness clamp: MIN_Y={MIN_Y}, MAX_Y={MAX_Y}",
         f"Payload RNG: numpy.random.default_rng; base seed={PAYLOAD_SEED}; "
         "per-image seed=base seed + zero-based index after sorted usable-row selection",
         f"Payload source: {PAYLOAD_SOURCE_BYTES} uniformly random bytes per image; "
@@ -368,13 +425,15 @@ def _write_run_info(
 
 
 def run_study(root: str | Path, quick: bool = False) -> dict[str, Any]:
-    """Run the study with all generated outputs confined to root/results/compression."""
+    """Run the study with outputs confined to root/results/compression_margin6."""
     root_path = Path(root).resolve()
     dataset_root = (root_path / "images" / "dataset").resolve()
-    output_dir = (root_path / "results" / "compression").resolve()
-    expected_output = (root_path / "results" / "compression").resolve()
+    output_dir = (root_path / "results" / "compression_margin6").resolve()
+    expected_output = (root_path / "results" / "compression_margin6").resolve()
     if output_dir != expected_output or root_path not in output_dir.parents:
-        raise AssertionError(f"Refusing output path outside results/compression: {output_dir}")
+        raise AssertionError(
+            f"Refusing output path outside results/compression_margin6: {output_dir}"
+        )
     manifest_path = dataset_root / "manifest.csv"
     if not manifest_path.is_file():
         raise FileNotFoundError(f"Dataset manifest not found: {manifest_path}")
@@ -435,6 +494,24 @@ def run_study(root: str | Path, quick: bool = False) -> dict[str, Any]:
                 message_seed = PAYLOAD_SEED + image_index
                 message, payload, expected_bits = _message_and_payload(message_seed)
                 log(f"[{image_index + 1}/{len(usable_rows)}] {category}/{image_name}")
+
+                processed_control_rgb = _processed_control_rgb(cover_rgb)
+                processed_control_psnr, processed_control_ssim = _metric_pair(
+                    cover_rgb, processed_control_rgb
+                )
+                image_records.append(
+                    _make_record(
+                        record_type="processed_control",
+                        image=image_name,
+                        category=category,
+                        method="processed_control",
+                        embed_quality="none",
+                        jpeg_quality="none",
+                        subsampling="none",
+                        processed_control_psnr=processed_control_psnr,
+                        processed_control_ssim=processed_control_ssim,
+                    )
+                )
 
                 # A cover-only JPEG is saved once per image and JPEG setting.
                 cover_metrics: dict[tuple[int, str], tuple[float, float]] = {}
@@ -570,6 +647,9 @@ def run_study(root: str | Path, quick: bool = False) -> dict[str, Any]:
     log("Cover-only JPEG loss against the original cover:")
     log(_cover_baseline_summary(records))
     log()
+    log("Processed-control cost against the original cover (no message):")
+    log(_processed_control_summary(records))
+    log()
     log("Exact recovery and BER across images (only no-compression-clean image/method pairs):")
     recovery_report = _recovery_summary(records)
     log(recovery_report)
@@ -606,6 +686,7 @@ def run_study(root: str | Path, quick: bool = False) -> dict[str, Any]:
         len(usable_rows),
         unusable_count,
         len(errors),
+        _git_commit_hash(root_path),
     )
     summary_path = output_dir / (
         "compression_quick_summary.txt" if quick else "compression_summary.txt"
