@@ -2,8 +2,14 @@
 
 DCT block order is sequential, so a password authenticates the payload but does
 not conceal the message or its embedding locations. The complete-block Y plane
-is clamped to [MIN_Y, MAX_Y] for brightness headroom, which slightly alters very
-dark and very bright cover pixels.
+is clamped to [MIN_Y, MAX_Y] for brightness headroom. The margin must be at
+least the worst-case one-step pixel change, calculated as step * 0.2265 + 0.5
+for rounding: 5.48 Y levels at embedding quality 50 and 2.99 at quality 75.
+The margin is 6 based on the Phase 3b measurement: there were zero errors on all
+15 usable dataset images and all 3 synthetic cases at qualities 50 and 75 for
+each tested margin from 16 down to 2, and failures occurred at margin 0. The
+synthetic cases used their capacity-limited payload prefix. This clamp causes a
+global tone change: blacks are lifted to 6 and whites are lowered to 249.
 """
 
 from math import pi, sqrt
@@ -29,8 +35,8 @@ EMBED_QUALITY = 75
 # Zero-based row/column: away from DC (low frequency) and the high-frequency corner.
 DCT_POSITION = (3, 2)
 REPETITION = 3
-MIN_Y = 16
-MAX_Y = 239
+MIN_Y = 6
+MAX_Y = 249
 
 JPEG_LUMINANCE_QUANT_TABLE = np.array(
     [
@@ -80,8 +86,8 @@ MAX_PIXEL_CHANGE_PER_QUANT_STEP = float(
     quantization_table(EMBED_QUALITY)[DCT_POSITION] * np.max(np.abs(_POSITION_BASIS))
 )
 # At quality 75, position (3, 2) has step 11 and a maximum pixel change
-# of about 2.492 Y levels for one coefficient step. [16, 239] leaves 16 levels
-# of headroom at either end, including the at-most-one-level integer rounding.
+# of about 2.492 Y levels for one coefficient step. The six-level margin also
+# exceeds the worst-case quality-50 bound, including integer rounding.
 
 
 def _read_luma(path: str) -> tuple[np.ndarray, np.ndarray]:
@@ -153,11 +159,17 @@ def hide(
     ``quality`` selects the embedding quantization table. It is not the quality
     of a later JPEG save; extraction must use the same embedding quality.
     DCT blocks are sequential, so a password authenticates but does not conceal
-    the message. The complete-block Y channel is clamped to [16, 239] to provide
-    headroom against clipping; this slightly alters very dark and bright cover
-    pixels. At the default setting, one coefficient step changes a pixel by at
-    most about 2.492 Y levels before integer rounding.
+    the message. The complete-block Y channel is clamped to [MIN_Y, MAX_Y] to
+    provide headroom against clipping; this lifts very dark and lowers very
+    bright cover pixels. The six-level margin is guaranteed for embedding
+    qualities 50 through 95. At the default setting, one coefficient step
+    changes a pixel by at most about 2.492 Y levels before integer rounding.
     """
+    if not 50 <= quality <= 95:
+        raise ValueError(
+            "Embedding quality must be between 50 and 95; "
+            "the brightness-clamp margin is only guaranteed for that range"
+        )
     table = quantization_table(quality)
     message_bytes = message.encode("utf-8")
     hmac_key = None
@@ -238,6 +250,11 @@ def extract(
     ``quality`` is the embedding design quality used to quantize coefficients,
     not the quality used to save an image as JPEG later.
     """
+    if not 50 <= quality <= 95:
+        raise ValueError(
+            "Embedding quality must be between 50 and 95; "
+            "the brightness-clamp margin is only guaranteed for that range"
+        )
     quantization_table(quality)  # Validate quality before image processing.
     payload_bits = read_majority_bits(path, quality=quality)
     complete_bits = payload_bits[:len(payload_bits) // 8 * 8]
