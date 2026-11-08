@@ -1,20 +1,20 @@
 Phase 5A compression-survival study
-Started: 2026-11-07T13:54:40+05:30
-Finished: 2026-11-07T13:57:35+05:30
-Mode: quick
-Git commit hash: ab76c2548f6ad205f1a2c302401d8deba2960465
+Started: 2026-11-07T14:10:14+05:30
+Finished: 2026-11-07T15:06:02+05:30
+Mode: full
+Git commit hash: aec64c6293f190ebb7472d63dc9a08d684564551
 Brightness clamp: MIN_Y=6, MAX_Y=249
 Payload RNG: numpy.random.default_rng; base seed=20261105; per-image seed=base seed + zero-based index after sorted usable-row selection
 Payload source: 40 uniformly random bytes per image; Base64 ASCII message so the project's UTF-8 APIs preserve the source bytes
 Framing: 5-byte stop marker + 64-byte HMAC-SHA256 hex tag
 Password label: phase5a-fixed-study-password (password text omitted)
-JPEG qualities: 100, 70
+JPEG qualities: 100, 90, 75, 70, 65, 60, 50, 30
 JPEG save settings: format=JPEG, quality=<listed quality>, optimize=False, progressive=False; 4:4:4 passes subsampling=0; Pillow default variant omits subsampling (Pillow/libjpeg RGB default, 4:2:0)
 Pillow: 13.0.0
 NumPy: 2.5.4
 SciPy: 1.18.1
 scikit-image: 0.26.0
 Matplotlib: 3.11.2
-Usable images selected: 3
+Usable images selected: 23
 Manifest rows skipped as unusable: 4
 Images skipped after errors: 0
