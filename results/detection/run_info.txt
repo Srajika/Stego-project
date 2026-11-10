@@ -1,0 +1,37 @@
+Phase 5B dataset detection study
+Started: 2026-11-09T14:32:01+05:30
+Finished: 2026-11-09T14:59:14+05:30
+Mode: full
+Git commit hash: 33c7bd4572fa9242b7cf9ac5bcb9e28e1a56769a
+Dataset manifest: images/dataset/manifest.csv
+Images selected: 23 of 23 usable images
+Selected images: bright_01.png, bright_02.png, bright_03.png, bright_04.png, bright_05.png, dark_01.png, dark_02.png, dark_03.png, dark_04.png, graphics_01.png, graphics_02.png, graphics_03.png, graphics_04.png, graphics_06.png, photos_01.png, photos_02.png, photos_04.png, photos_05.png, photos_06.png, screenshot_01.png, screenshot_02.png, screenshot_03.png, screenshot_05.png
+Total runtime seconds: 1632.541707
+Measured full-run seconds: 1632.542
+Python: 3.13.17
+NumPy: 2.5.4
+Pillow: 13.0.0
+SciPy: 1.18.1
+Matplotlib: 3.11.2
+DCT clamp margin: MIN_Y=6, MAX_Y=249
+LSB detector threshold: 0.01
+DCT parity detector threshold: 0.01
+DCT copy-corrected p-value: chi2.sf(statistic / REPETITION, 1), with REPETITION=3; this counts the three repeated copies of each payload bit once.
+Original detector p-values and verdicts are retained alongside copy-corrected DCT values.
+CSV luminance descriptors: standard deviation of Y from RGB-to-YCbCr; flat-block fraction is complete 8x8 blocks with Y range <= 2; distinct RGB is the exact number of unique 24-bit RGB colors.
+ROC p-value thresholds: 0.001, 0.01, 0.05, 0.1
+Embedding quality for DCT: 75 (project EMBED_QUALITY)
+DCT coefficient position: (3, 2)
+Payload framing: marker and tag included in target capacity rate; actual rate = framed payload bits / method capacity bits * 100.
+Payload base seed: 20261108
+Payload seed formula: base + sorted_manifest_image_index*1000000 + method_id*100000 + requested_rate*100 + content_id; method_id plain_lsb=1, password_lsb=2, dct=3; content_id uniform_random_bytes=1, printable_text=2.
+Exact per-image/per-rate payload seeds are recorded in the CSV seed column.
+Crop base seed: 20261109
+Crop seed formula: base + sorted_manifest_image_index*1000000 + size_id*10000 + zero_based_crop_index; size_id 1=256x192, 2=512x384.
+Crops per image per size in this run: 5
+Crop coordinates are sampled by random.Random(crop_seed) from the full cover; pixel values are saved unchanged as RGB PNG for detector input.
+Crop requests larger than a cover are recorded as unavailable_crop rows in the CSV and output; no detector result or descriptor exists for those requests.
+DCT requested-rate rows below the fixed framing overhead are recorded as unavailable rows in the CSV and output and excluded from detection-rate denominators.
+Uniform-byte and printable-text payload generation/embedding reuse helpers from analysis.detect_check and analysis.dct_detect_check.
+Clean-cover false alarms use raw covers/crops. DCT processed controls are reported separately and are not used for the clean-cover false-alarm rate.
+Quick duration estimate scales measured per-phase means by full-vs-quick payload row counts and crop count; it is a linear estimate, not a full-run measurement.
