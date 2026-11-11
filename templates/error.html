@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Request issue | Stego Lab{% endblock %}
+{% block content %}
+<section class="panel panel-red error-page">
+  <p class="eyebrow">REQUEST ISSUE</p>
+  <h1>Try that again</h1>
+  <p class="error-box" role="alert">{{ error }}</p>
+  <a class="button-link" href="{{ url_for('home') }}">Back to Home</a>
+</section>
+{% endblock %}

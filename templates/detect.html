@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Detect | Stego Lab{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <p class="eyebrow">04 / INSPECT AN IMAGE</p>
+  <h1>Detect</h1>
+  <p>These are statistical clues, not proof that an image does or does not contain a message.</p>
+</section>
+
+<div class="content-grid">
+  <section class="panel panel-cyan">
+    <h2>Run detectors</h2>
+    {% if error %}<p class="error-box" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" enctype="multipart/form-data" class="form-stack">
+      <label for="image">Image to inspect (PNG, JPG, or JPEG)</label>
+      <input id="image" name="image" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" required>
+      <button type="submit">Analyze image</button>
+    </form>
+    <p class="processing-note">Large DCT images may take up to a minute to process.</p>
+  </section>
+
+  <aside class="panel panel-red limitations">
+    <h2>Limitations</h2>
+    <ul>
+      <li>Can miss text-like payloads and low embedding rates.</li>
+      <li>Can produce false alarms on small or busy images.</li>
+      <li>The DCT parity detector is configured for embedding quality 75 only. Quality-50 robust images are not covered by this detector.</li>
+    </ul>
+  </aside>
+</div>
+
+{% if result %}
+<section class="detector-results">
+  <h2>Detector results</h2>
+  <article class="panel panel-plain detector-card">
+    <h3>LSB chi-square</h3>
+    <p>Statistic: <strong>{{ '%.6g'|format(result.lsb.statistic) }}</strong></p>
+    <p>p-value: <strong>{{ '%.6g'|format(result.lsb.p_value) }}</strong></p>
+    <div class="verdict-row"><span>Verdict</span><strong>{{ result.lsb.verdict }}</strong></div>
+  </article>
+  <article class="panel panel-yellow detector-card">
+    <h3>Sequential LSB chi-square (20 steps)</h3>
+    <p>Final-prefix statistic: <strong>{{ '%.6g'|format(result.sequential_statistic) }}</strong></p>
+    <p>Final-prefix p-value: <strong>{{ '%.6g'|format(result.sequential_p_value) }}</strong></p>
+    <p>Estimated payload end: <strong>{% if result.sequential.estimated_payload_end_rate is none %}not estimated{% else %}{{ '%.2f'|format(result.sequential.estimated_payload_end_rate) }}%{% endif %}</strong></p>
+    <div class="verdict-row"><span>Verdict</span><strong>{{ result.sequential.verdict }}</strong></div>
+  </article>
+  <article class="panel panel-pink detector-card">
+    <h3>DCT parity (embedding quality 75 only)</h3>
+    <p>Statistic: <strong>{{ '%.6g'|format(result.dct.statistic) }}</strong></p>
+    <p>Original p-value: <strong>{{ '%.6g'|format(result.dct.p_value) }}</strong></p>
+    <p>Copy-corrected p-value: <strong>{{ '%.6g'|format(result.dct_corrected_p_value) }}</strong></p>
+    <p class="field-note">The corrected value uses chi-square survival at statistic / REPETITION, counting the three copies once.</p>
+    <div class="verdict-row"><span>Verdict</span><strong>{{ result.dct.verdict }}</strong></div>
+  </article>
+</section>
+{% endif %}
+{% endblock %}

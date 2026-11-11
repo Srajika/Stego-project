@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Hide | Stego Lab{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <p class="eyebrow">02 / WRITE A PAYLOAD</p>
+  <h1>Hide</h1>
+  <p>Message size is measured in UTF-8 bytes. The 69-byte marker and integrity tag are included in the image capacity.</p>
+</section>
+
+<section class="method-panel panel panel-plain">
+  <h2>Choose a method</h2>
+  <div class="method-picker">
+    {% for method_item in methods %}
+    <a class="method-choice{% if method_item[0] == selected_method_key %} selected{% endif %}"
+       href="{{ url_for('hide_page', method=method_item[0]) }}"
+       aria-current="{% if method_item[0] == selected_method_key %}page{% else %}false{% endif %}">
+      <span>{{ method_item[1].name }}</span>
+      <small>{{ method_item[1].description }}</small>
+    </a>
+    {% endfor %}
+  </div>
+  <p class="method-note"><strong>Selected:</strong> {{ selected_method.name }}. {{ selected_method.description }}</p>
+</section>
+
+<div class="content-grid">
+  <section class="panel panel-cyan">
+    <h2>Cover and message</h2>
+    {% if error %}<p class="error-box" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" enctype="multipart/form-data" class="form-stack">
+      <input type="hidden" name="method" value="{{ selected_method_key }}">
+      <label for="cover">Cover image (PNG, JPG, or JPEG)</label>
+      <input id="cover" name="cover" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" required>
+
+      <label for="message">Message</label>
+      <textarea id="message" name="message" rows="6" maxlength="100000" required>{{ request.form.get('message', '') }}</textarea>
+
+      <label for="password">Password</label>
+      {% if password_mode == 'none' %}
+      <input id="password" name="password" type="password" autocomplete="new-password" disabled aria-disabled="true">
+      <p class="field-note">Disabled for plain LSB; this method does not use a password.</p>
+      {% elif password_mode == 'required' %}
+      <input id="password" name="password" type="password" autocomplete="new-password" required>
+      <p class="field-note">Required to shuffle positions and to authenticate this message.</p>
+      {% else %}
+      <input id="password" name="password" type="password" autocomplete="new-password">
+      <p class="field-note">Optional. It keys the integrity tag; DCT placement remains readable without it.</p>
+      {% endif %}
+
+      <button type="submit">Hide message</button>
+    </form>
+  </section>
+
+  <aside class="panel panel-yellow side-panel">
+    <h2>Capacity check</h2>
+    {% if capacity %}
+    <p class="big-number">{{ capacity.max_message_bytes }} bytes</p>
+    <p>Maximum message size for this image and method, after the fixed 69-byte marker and tag.</p>
+    <p>Submitted message: <strong>{{ message_size }} UTF-8 bytes</strong>.</p>
+    {% else %}
+    <p>Upload a cover and submit the form to see its capacity and the exact UTF-8 message size.</p>
+    {% endif %}
+    {% if selected_method.kind == 'dct' %}
+    <p class="warning-box">DCT uses embedding quality {{ selected_method.quality }}. Extract with this same method and quality. A password authenticates, but does not conceal, the message.</p>
+    {% endif %}
+    {% if result %}
+    <div class="result-card">
+      <h3>PNG ready</h3>
+      <p>{{ result.description }}</p>
+      <p>PSNR: <strong>{{ '%.2f'|format(result.metrics.psnr) }} dB</strong></p>
+      <p>SSIM: <strong>{{ '%.5f'|format(result.metrics.ssim) }}</strong></p>
+      <p>Maximum RGB pixel change: <strong>{{ result.metrics.max_pixel_change }}</strong></p>
+      <a class="button-link" href="{{ result.download_url }}">Download stego PNG</a>
+    </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

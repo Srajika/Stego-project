@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Home | Stego Lab{% endblock %}
+{% block content %}
+<section class="hero panel panel-yellow">
+  <p class="eyebrow">A SMALL, EXPLAINABLE IMAGE LAB</p>
+  <h1>Hide a message.<br>Read the signal.</h1>
+  <p class="lede">Compare least-significant-bit and block-DCT steganography, then inspect an image with simple statistical detectors.</p>
+  <p class="local-warning"><strong>LOCAL DEMO ONLY.</strong> This app binds to 127.0.0.1 and is not designed for public deployment.</p>
+</section>
+
+<section class="home-grid" aria-label="Demo pages">
+  <article class="panel panel-cyan">
+    <p class="eyebrow">02 / WRITE</p>
+    <h2>Hide a message</h2>
+    <p>Choose plain or shuffled LSB, or DCT at quality 50 or 75. The output is a lossless PNG.</p>
+    <a class="button-link" href="{{ url_for('hide_page') }}">Open Hide</a>
+  </article>
+  <article class="panel panel-pink">
+    <p class="eyebrow">03 / READ</p>
+    <h2>Extract a message</h2>
+    <p>Use the same method and embedding quality used on the Hide page. Try JPEG damage or random pixel edits.</p>
+    <a class="button-link" href="{{ url_for('extract_page') }}">Open Extract</a>
+  </article>
+  <article class="panel panel-green">
+    <p class="eyebrow">04 / INSPECT</p>
+    <h2>Detect patterns</h2>
+    <p>Run two LSB checks and the targeted DCT parity detector on one image.</p>
+    <a class="button-link" href="{{ url_for('detect_page') }}">Open Detect</a>
+  </article>
+</section>
+
+<aside class="panel panel-plain explainer">
+  <h2>Methods at a glance</h2>
+  <p><strong>LSB</strong> changes the low bit of colour channels. JPEG usually destroys those bits.</p>
+  <p><strong>DCT</strong> changes quantized block coefficients. A password checks integrity but does not conceal where the message is stored.</p>
+</aside>
+{% endblock %}

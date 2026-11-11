@@ -55,20 +55,27 @@ def run_test() -> None:
         assert all(path.is_file() for path in result["plot_paths"])
         with result["csv_path"].open("r", encoding="utf-8", newline="") as source:
             rows = list(csv.DictReader(source))
-        assert len(rows) == 2 * (4 * (1 + 2 * 2) + 2 * 2)
+        assert len(rows) == 2 * (4 * (1 + 2 * 2) + 2 * 2 + 1)
         assert set(rows[0]) == set(CSV_COLUMNS)
         no_compression = [
             row for row in rows
             if row["record_type"] == "stego" and row["jpeg_quality"] == "none"
         ]
         cover_rows = [row for row in rows if row["record_type"] == "cover_baseline"]
+        processed_controls = [
+            row for row in rows if row["record_type"] == "processed_control"
+        ]
         assert len(no_compression) == 2 * 4
         assert len(cover_rows) == 2 * 2 * 2
+        assert len(processed_controls) == 2
         for row in no_compression:
             assert row["exact_recovery"] in ("True", "False")
         for row in cover_rows:
             assert row["cover_reconstruction_psnr"]
             assert row["cover_reconstruction_ssim"]
+        for row in processed_controls:
+            assert row["processed_control_psnr"]
+            assert row["processed_control_ssim"]
 
 
 if __name__ == "__main__":

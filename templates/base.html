@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff8e7">
+  <title>{% block title %}Stego Lab{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="brand-strip">
+      <a class="brand" href="{{ url_for('home') }}">STEGO LAB</a>
+      <span class="brand-note">LOCAL IMAGE DEMO / PHASE 6</span>
+    </div>
+    <nav class="nav-stack" aria-label="Main navigation">
+      <div class="nav-row">
+        <a href="{{ url_for('home') }}">01 / Home</a>
+        <a href="{{ url_for('hide_page') }}">02 / Hide</a>
+      </div>
+      <div class="nav-row">
+        <a href="{{ url_for('extract_page') }}">03 / Extract</a>
+        <a href="{{ url_for('detect_page') }}">04 / Detect</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main" class="main-shell">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <p>LOCAL DEMO · FILES STAY IN A TEMPORARY FOLDER</p>
+  </footer>
+</body>
+</html>

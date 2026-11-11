@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Extract | Stego Lab{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <p class="eyebrow">03 / READ A PAYLOAD</p>
+  <h1>Extract</h1>
+  <p>Select the exact method used on Hide. DCT extraction also requires the same embedding quality; the image does not store that setting for you.</p>
+</section>
+
+<section class="method-panel panel panel-plain">
+  <h2>Choose the Hide method</h2>
+  <div class="method-picker">
+    {% for method_item in methods %}
+    <a class="method-choice{% if method_item[0] == selected_method_key %} selected{% endif %}"
+       href="{{ url_for('extract_page', method=method_item[0]) }}"
+       aria-current="{% if method_item[0] == selected_method_key %}page{% else %}false{% endif %}">
+      <span>{{ method_item[1].name }}</span>
+      <small>{{ method_item[1].description }}</small>
+    </a>
+    {% endfor %}
+  </div>
+  <p class="method-note"><strong>Selected extraction:</strong> {{ selected_method.name }}. Match this to the Hide choice, including the DCT quality.</p>
+</section>
+
+<div class="content-grid">
+  <section class="panel panel-pink">
+    <h2>Stego image and checks</h2>
+    {% if error %}<p class="error-box" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" enctype="multipart/form-data" class="form-stack">
+      <input type="hidden" name="method" value="{{ selected_method_key }}">
+      <label for="stego_image">Stego image (PNG, JPG, or JPEG)</label>
+      <input id="stego_image" name="stego_image" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" required>
+
+      <label for="extract_password">Password</label>
+      {% if selected_method.password_mode == 'none' %}
+      <input id="extract_password" name="password" type="password" disabled aria-disabled="true">
+      <p class="field-note">Disabled for plain LSB.</p>
+      {% elif selected_method.password_mode == 'required' %}
+      <input id="extract_password" name="password" type="password" autocomplete="current-password">
+      <p class="field-note">Enter the Hide password. Leave blank to demonstrate that shuffled LSB cannot be read without it.</p>
+      {% else %}
+      <input id="extract_password" name="password" type="password" autocomplete="current-password">
+      <p class="field-note">Optional integrity password. DCT messages remain readable without it.</p>
+      {% endif %}
+
+      <fieldset>
+        <legend>Optional image changes</legend>
+        <label class="check-row"><input type="checkbox" name="simulate_jpeg" value="yes"> Simulate JPEG compression first</label>
+        <label for="jpeg_quality">JPEG quality (default 4:2:0)</label>
+        <input id="jpeg_quality" name="jpeg_quality" type="range" min="30" max="100" value="70">
+        <label class="check-row"><input type="checkbox" name="simulate_tamper" value="yes"> Flip random pixel LSBs</label>
+        <label for="tamper_count">Number of random pixels to edit</label>
+        <input id="tamper_count" name="tamper_count" type="number" min="1" max="100000" value="10000">
+      </fieldset>
+      <button type="submit">Extract message</button>
+    </form>
+  </section>
+
+  <aside class="panel panel-yellow side-panel">
+    <h2>Result</h2>
+    {% if selected_method.kind == 'dct' %}
+    <p class="warning-box">DCT quality {{ selected_method.quality }}: choose this same Hide method and embedding quality. A password authenticates the tag but does not conceal the message.</p>
+    {% endif %}
+    {% if result %}
+    <div class="status-block status-{{ result.status_class }}" role="status">
+      <span class="status-label">{{ result.status_label }}</span>
+    </div>
+    {% if result.message is not none %}
+    <h3>Message</h3>
+    <pre class="message-output">{{ result.message }}</pre>
+    {% else %}
+    <p>No readable message was returned.</p>
+    {% endif %}
+    {% if result.simulated_jpeg %}<p>JPEG simulation applied at quality {{ result.jpeg_quality }}, using 4:2:0 subsampling.</p>{% endif %}
+    {% if result.simulated_tamper %}<p>{{ result.tamper_note }} Pixels edited: {{ result.tamper_count }}.</p>{% endif %}
+    {% else %}
+    <p>Extraction status will appear here with a text label.</p>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}
