@@ -46,7 +46,29 @@
       <p class="field-note">Optional. It keys the integrity tag; DCT placement remains readable without it.</p>
       {% endif %}
 
-      <button type="submit">Hide message</button>
+      <button type="submit" name="action" value="message">Hide message</button>
+
+      <fieldset class="demo-fieldset">
+        <legend>Detector demo</legend>
+        <p><strong>Detector demo: ignore the message and fill the image with random bytes.</strong></p>
+        {% if selected_method_key == 'lsb_plain' %}
+        <p class="field-note">Plain LSB offers three fill amounts. The default seed makes each selection repeatable.</p>
+        {% for rate in (10, 50, 100) %}
+        <label><input type="radio" name="demo_fill_rate" value="{{ rate }}" {% if request.form.get('demo_fill_rate', '10') == rate|string %}checked{% endif %}> {{ rate }}% of capacity</label>
+        {% endfor %}
+        <button type="submit" name="action" value="detector_demo" formnovalidate>Build plain LSB demo</button>
+        {% elif selected_method_key == 'lsb_password' %}
+        <input type="hidden" name="demo_fill_rate" value="100">
+        <p class="field-note">Shuffled LSB demo uses 100% capacity and the fixed Phase 5B study password for placement.</p>
+        <button type="submit" name="action" value="detector_demo" formnovalidate>Build shuffled LSB demo at 100%</button>
+        {% elif selected_method_key == 'dct_balanced' %}
+        <input type="hidden" name="demo_fill_rate" value="100">
+        <p class="field-note">DCT detector demo uses embedding quality 75 at 100% capacity.</p>
+        <button type="submit" name="action" value="detector_demo" formnovalidate>Build DCT 75 demo at 100%</button>
+        {% else %}
+        <p class="field-note">The detector demo is available for DCT embedding quality 75, not quality 50.</p>
+        {% endif %}
+      </fieldset>
     </form>
   </section>
 
@@ -55,7 +77,11 @@
     {% if capacity %}
     <p class="big-number">{{ capacity.max_message_bytes }} bytes</p>
     <p>Maximum message size for this image and method, after the fixed 69-byte marker and tag.</p>
+    {% if result and result.demo_payload %}
+    <p>The message field was ignored for this random-byte demonstration.</p>
+    {% else %}
     <p>Submitted message: <strong>{{ message_size }} UTF-8 bytes</strong>.</p>
+    {% endif %}
     {% else %}
     <p>Upload a cover and submit the form to see its capacity and the exact UTF-8 message size.</p>
     {% endif %}
@@ -66,10 +92,15 @@
     <div class="result-card">
       <h3>PNG ready</h3>
       <p>{{ result.description }}</p>
+      {% if result.demo_payload %}
+      <p class="warning-box">Demonstration payload: random bytes, NOT a readable message; Extract will not show text.</p>
+      <p>Fill amount: <strong>{{ result.demo_payload.fill_rate }}%</strong>; actual framed payload rate: <strong>{{ '%.4f'|format(result.demo_payload.actual_rate_pct) }}%</strong>.</p>
+      <p>Framed payload: <strong>{{ result.demo_payload.payload_bytes }} bytes</strong>; one-bit fraction: <strong>{{ '%.4f'|format(result.demo_payload.one_bit_fraction * 100) }}%</strong>; fixed seed: <strong>{{ result.demo_payload.seed }}</strong>.</p>
+      {% endif %}
       <p>PSNR: <strong>{{ '%.2f'|format(result.metrics.psnr) }} dB</strong></p>
       <p>SSIM: <strong>{{ '%.5f'|format(result.metrics.ssim) }}</strong></p>
       <p>Maximum RGB pixel change: <strong>{{ result.metrics.max_pixel_change }}</strong></p>
-      <a class="button-link" href="{{ result.download_url }}">Download stego PNG</a>
+      <a class="button-link" href="{{ result.download_url }}">{% if result.demo_payload %}Download demonstration PNG{% else %}Download stego PNG{% endif %}</a>
     </div>
     {% endif %}
   </aside>

@@ -22,6 +22,7 @@ from webapp_helpers import (
     MAX_UPLOAD_BYTES,
     METHODS,
     STATUS_LABELS,
+    build_detector_demo,
     cleanup_old_files,
     copy_corrected_p_value,
     expire_file_later,
@@ -120,11 +121,16 @@ def create_app(test_config: dict | None = None) -> Flask:
                 error=None, result=None
             )
 
+        demo_mode = request.form.get("action") == "detector_demo"
         message = request.form.get("message", "")
         password = request.form.get("password", "") or None
-        message_size = len(message.encode("utf-8"))
+        message_size = 0 if demo_mode else len(message.encode("utf-8"))
         try:
-            if context["password_mode"] == "required" and not password:
+            if (
+                not demo_mode
+                and context["password_mode"] == "required"
+                and not password
+            ):
                 raise ValueError("Enter a password for password-shuffled LSB.")
 
             cover_path, dimensions = save_verified_upload(
@@ -132,33 +138,47 @@ def create_app(test_config: dict | None = None) -> Flask:
             )
             temporary_files.append(cover_path)
             capacity = method_capacity(dimensions[0], dimensions[1], method_key)
-            if "#####" in message:
-                raise ValueError("Messages cannot contain the stop marker #####.")
-            if message_size > capacity["max_message_bytes"]:
-                raise ValueError(
-                    f"This message is {message_size} UTF-8 bytes; this image "
-                    f"allows at most {capacity['max_message_bytes']} message bytes "
-                    "after the 69-byte marker and tag."
-                )
-
             output_path = random_path(temp_root, ".png")
-            if context["selected_method"]["kind"] == "lsb":
-                lsb.hide(
-                    str(cover_path), str(output_path), message,
-                    password=password if context["password_mode"] == "required" else None,
+            demo_payload = None
+            if demo_mode:
+                try:
+                    fill_rate = int(request.form.get("demo_fill_rate", "10"))
+                except ValueError as error:
+                    raise ValueError("Choose one of the offered detector demo fill amounts.") from error
+                demo_payload = build_detector_demo(
+                    cover_path, output_path, method_key, fill_rate
                 )
+                description = "A seeded random-byte payload was embedded using the Phase 5B study path."
             else:
-                dct.hide(
-                    str(cover_path), str(output_path), message,
-                    password=password,
-                    quality=context["selected_method"]["quality"],
-                )
+                if not message:
+                    raise ValueError("Enter a message to hide.")
+                if "#####" in message:
+                    raise ValueError("Messages cannot contain the stop marker #####.")
+                if message_size > capacity["max_message_bytes"]:
+                    raise ValueError(
+                        f"This message is {message_size} UTF-8 bytes; this image "
+                        f"allows at most {capacity['max_message_bytes']} message bytes "
+                        "after the 69-byte marker and tag."
+                    )
+                if context["selected_method"]["kind"] == "lsb":
+                    lsb.hide(
+                        str(cover_path), str(output_path), message,
+                        password=password if context["password_mode"] == "required" else None,
+                    )
+                else:
+                    dct.hide(
+                        str(cover_path), str(output_path), message,
+                        password=password,
+                        quality=context["selected_method"]["quality"],
+                    )
+                description = context["selected_method"]["description"]
             metrics = quality_metrics(cover_path, output_path)
             keep_output = True
             expire_file_later(output_path)
             result = {
                 "metrics": metrics,
-                "description": context["selected_method"]["description"],
+                "description": description,
+                "demo_payload": demo_payload,
                 "download_url": url_for("download_image", token=output_path.stem),
             }
         except ValueError as error:
@@ -297,6 +317,11 @@ def create_app(test_config: dict | None = None) -> Flask:
                     dct_result["statistic"]
                 ),
             }
+            result["dct_corrected_verdict"] = (
+                "DCT embedding likely"
+                if result["dct_corrected_p_value"] >= 0.01
+                else "no evidence of DCT embedding"
+            )
         except ValueError as error:
             error_message = str(error)
         except Exception:

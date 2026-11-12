@@ -19,6 +19,7 @@ from stego.dct import REPETITION, capacity_bits as dct_capacity_bits
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_SIDE = 4000
 PAYLOAD_OVERHEAD_BYTES = 69
+DEMO_SEED = 20261111
 
 METHODS = {
     "lsb_plain": {
@@ -100,14 +101,16 @@ def save_verified_upload(upload, temp_root: Path) -> tuple[Path, tuple[int, int]
     if extension not in {".png", ".jpg", ".jpeg"}:
         raise ValueError("Choose a PNG, JPG, or JPEG image.")
 
-    data = upload.stream.read(MAX_UPLOAD_BYTES + 1)
+    with upload.stream as stream:
+        data = stream.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise ValueError("The image must be 10 MB or smaller.")
     try:
-        with Image.open(io.BytesIO(data)) as image:
-            actual_format = image.format
-            size = image.size
-            image.verify()
+        with io.BytesIO(data) as image_bytes:
+            with Image.open(image_bytes) as image:
+                actual_format = image.format
+                size = image.size
+                image.verify()
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as error:
         raise ValueError("That file is not a valid PNG or JPEG image.") from error
 
@@ -224,3 +227,68 @@ def copy_corrected_p_value(statistic: float) -> float:
     if not math.isfinite(statistic):
         return float("nan")
     return float(chi2.sf(statistic / REPETITION, 1))
+
+
+def build_detector_demo(
+    cover_path: Path,
+    output_path: Path,
+    method_key: str,
+    fill_rate: int,
+) -> dict[str, float | int]:
+    """Build one seeded Phase 5B-style random-byte image for the detector demo."""
+    allowed_rates = {
+        "lsb_plain": {10, 50, 100},
+        "lsb_password": {100},
+        "dct_balanced": {100},
+    }
+    if method_key not in allowed_rates or fill_rate not in allowed_rates[method_key]:
+        raise ValueError("That detector demo method and fill amount are unavailable.")
+
+    try:
+        # These are private research helpers reused so the demo matches the Phase 5B study.
+        if method_key in {"lsb_plain", "lsb_password"}:
+            from analysis.detect_check import (
+                PASSWORD as PHASE5B_PASSWORD,
+                _embed_payload_bits,
+                _random_byte_payload,
+            )
+        else:
+            from analysis.dct_detect_check import (
+                _embed_payload_bytes,
+                _payload_size_bytes,
+                _uniform_payload,
+            )
+    except Exception as error:
+        raise ValueError(
+            "Demonstration option unavailable: the Phase 5B random-byte helpers could not be loaded."
+        ) from error
+
+    with Image.open(cover_path) as cover:
+        width, height = cover.size
+
+    if method_key in {"lsb_plain", "lsb_password"}:
+        capacity_bits = width * height * 3
+        password = PHASE5B_PASSWORD if method_key == "lsb_password" else None
+        payload = _random_byte_payload(
+            capacity_bits, fill_rate, DEMO_SEED, password
+        )
+        one_bit_fraction = _embed_payload_bits(
+            cover_path, output_path, payload, password
+        )
+    else:
+        capacity_bits = dct_capacity_bits(width, height)
+        payload_bytes = _payload_size_bytes(capacity_bits, fill_rate)
+        payload = _uniform_payload(payload_bytes, DEMO_SEED)
+        _embed_payload_bytes(cover_path, output_path, payload)
+        one_bit_fraction = float(
+            np.unpackbits(np.frombuffer(payload, dtype=np.uint8)).mean()
+        )
+
+    return {
+        "fill_rate": fill_rate,
+        "seed": DEMO_SEED,
+        "payload_bytes": len(payload),
+        "capacity_bits": capacity_bits,
+        "actual_rate_pct": len(payload) * 8 / capacity_bits * 100.0,
+        "one_bit_fraction": one_bit_fraction,
+    }
